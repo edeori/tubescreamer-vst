@@ -1,8 +1,10 @@
 #pragma once
 
 #include <array>
+#include <memory>
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include "DSP/ClipperStage.h"
 #include "DSP/ToneStage.h"
@@ -46,6 +48,12 @@ private:
     // hold internal cross-references between sibling members and must never be copied/reassigned.
     std::array<mothbite::ClipperStage, 2> clippers;
     std::array<mothbite::ToneStage, 2> toneStages;
+
+    // 4x oversampling around ClipperStage only (the hard diode nonlinearity) - ToneStage is
+    // purely linear and doesn't need it. Measured to remove several dB of aliasing-driven excess
+    // high-frequency energy at high drive that a plain single-rate WDF clipper introduces.
+    static constexpr int oversamplingFactorLog2 = 2; // 2^2 = 4x
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversampling;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MothBiteAudioProcessor)
 };

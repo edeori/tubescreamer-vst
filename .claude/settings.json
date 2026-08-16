@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Read(//Users/mothproduction/Documents/VSCode/DeathWings-VST/**)"
+      "Read(//Users/mothproduction/Documents/VSCode/DeathWings-VST/**)",
+      "Read(//Users/mothproduction/Documents/AudioPluginHost/presets/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/mothproduction/Documents/AudioPluginHost/presets"
     ]
   }
 }

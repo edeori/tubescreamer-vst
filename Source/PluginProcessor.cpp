@@ -45,10 +45,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout MothBiteAudioProcessor::crea
     return layout;
 }
 
-void MothBiteAudioProcessor::prepareToPlay (double sampleRate, int)
+void MothBiteAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    oversampling = std::make_unique<juce::dsp::Oversampling<float>> (
+        2, oversamplingFactorLog2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false);
+    oversampling->initProcessing ((size_t) samplesPerBlock);
+    setLatencySamples ((int) oversampling->getLatencyInSamples());
+
+    const auto oversampledRate = sampleRate * (double) oversampling->getOversamplingFactor();
+
     for (auto& clipper : clippers)
-        clipper.prepare (sampleRate);
+        clipper.prepare (oversampledRate);
 
     for (auto& tone : toneStages)
         tone.prepare (sampleRate);
@@ -85,17 +92,26 @@ void MothBiteAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     const auto numChannels = buffer.getNumChannels();
     const auto numSamples = buffer.getNumSamples();
 
+    juce::dsp::AudioBlock<float> block (buffer);
+    auto oversampledBlock = oversampling->processSamplesUp (block);
+    const auto numOversampledSamples = (int) oversampledBlock.getNumSamples();
+
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto& clipper = clippers[(size_t) ch];
-        auto& tone = toneStages[(size_t) ch];
-
         clipper.setDrive (drive);
         clipper.setAttack (attackIndex);
+        clipper.process (oversampledBlock.getChannelPointer ((size_t) ch), numOversampledSamples);
+    }
+
+    oversampling->processSamplesDown (block);
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto& tone = toneStages[(size_t) ch];
         tone.setBright (bright);
 
         auto* data = buffer.getWritePointer (ch);
-        clipper.process (data, numSamples);
         tone.process (data, numSamples);
 
         for (int i = 0; i < numSamples; ++i)
